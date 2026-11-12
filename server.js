@@ -37,6 +37,7 @@ app.use(express.json({ limit: '4mb' }));
 app.use((req, res, next) => { res.set('X-Content-Type-Options', 'nosniff'); next(); });
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/healthz', (req, res) => res.send('ok'));
+app.get('/', (req, res) => res.redirect('/lecturer.html'));
 
 // ---------- helpers ----------
 function distanceKm(lat1, lon1, lat2, lon2) {
@@ -156,7 +157,7 @@ app.get('/api/lecturer/me', lecturerOnly, (req, res) => res.json({ username: req
 app.post('/api/lecturer/session', lecturerOnly, (req, res) => {
   const { lat, lng, radiusKm } = req.body;
   let name = String(req.body.name || '').trim(), venue = '';
-  if (req.body.course === 'auto' || !name) {            // work out the course from the timetable
+  if (req.body.course === 'auto' || !name) {
     const slot = detectSlot(req.user.u);
     if (!slot) return res.status(400).json({ error: 'No class is on your timetable at this time. Choose the course yourself.' });
     name = slot.course; venue = slot.venue || '';
@@ -183,7 +184,6 @@ app.get('/api/lecturer/sessions', lecturerOnly, (req, res) => {
     .map((s) => ({ ...s, active: isActive(s), count: recs.filter((r) => r.code === s.code).length })));
 });
 
-// Present + absent lists and totals for one session (absent = this lecturer's class list minus those who signed)
 function buildSummary(s) {
   const records = load('records.json', []).filter((r) => r.code === s.code);
   const students = loadRoster(ownerOf(s));
@@ -204,12 +204,11 @@ app.post('/api/lecturer/session/:code/close', lecturerOnly, (req, res) => {
   const sessions = load('sessions.json', {});
   const t = sessions[s0.code];
   t.open = req.body.open === true;
-  if (t.open && isExpired(t)) t.expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // reopening an ended class gives 30 more minutes
+  if (t.open && isExpired(t)) t.expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   save('sessions.json', sessions);
   res.json({ ...t, active: isActive(t) });
 });
 
-// Give a class more time (for example a lecture that runs late)
 app.post('/api/lecturer/session/:code/extend', lecturerOnly, (req, res) => {
   const s0 = mine(req, res); if (!s0) return;
   const mins = Math.min(Math.max(Number(req.body.minutes) || 30, 5), 240);
@@ -252,7 +251,6 @@ app.get('/api/lecturer/selfie/:file', lecturerOnly, (req, res) => {
 
 app.get('/api/lecturer/students', lecturerOnly, (req, res) => res.json({ total: loadRoster(req.user.u).length }));
 
-// Paste a class list: one student per line -> ID, Name, Programme, Year (tab or comma separated; Excel paste works)
 app.post('/api/lecturer/students', lecturerOnly, (req, res) => {
   const lines = String(req.body.text || '').split(/\r?\n/);
   const students = loadRoster(req.user.u);
@@ -273,14 +271,12 @@ app.post('/api/lecturer/students', lecturerOnly, (req, res) => {
 
 app.delete('/api/lecturer/students', lecturerOnly, (req, res) => { saveRoster(req.user.u, []); res.json({ ok: true }); });
 
-
-// ---------- courses (each lecturer keeps a list of the courses they teach) ----------
+// ---------- courses ----------
 const courseFile = (u) => path.join(COURSES, u + '.json');
 const loadCourses = (u) => { try { return JSON.parse(fs.readFileSync(courseFile(u), 'utf8')); } catch { return []; } };
 const saveCourses = (u, list) => { const t = courseFile(u) + '.tmp'; fs.writeFileSync(t, JSON.stringify(list, null, 2)); fs.renameSync(t, courseFile(u)); };
 app.get('/api/lecturer/courses', lecturerOnly, (req, res) => res.json(loadCourses(req.user.u)));
 app.post('/api/lecturer/courses', lecturerOnly, (req, res) => {
-  // one course per line, so a whole list can be pasted at once
   const names = String(req.body.name || '').split(/\r?\n/).map((x) => x.replace(/\s+/g, ' ').trim().slice(0, 80)).filter(Boolean);
   if (!names.length) return res.status(400).json({ error: 'Type the course name.' });
   const list = loadCourses(req.user.u); let added = 0;
@@ -296,7 +292,6 @@ app.post('/api/lecturer/courses/remove', lecturerOnly, (req, res) => {
   saveCourses(req.user.u, loadCourses(req.user.u).filter((c) => c !== name)); res.json(loadCourses(req.user.u));
 });
 
-// One table for a whole course: every student, how many classes they attended, and the percentage
 function buildReport(req, course) {
   const sessions = Object.values(load('sessions.json', {}))
     .filter((s) => ownerOf(s) === req.user.u && s.name === course)
@@ -323,20 +318,18 @@ app.get('/api/lecturer/report.csv', lecturerOnly, (req, res) => {
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="report-${fn}.csv"` }).send(lines.join('\r\n'));
 });
 
-
-// ---------- weekly timetable: lets the app know which course is on right now ----------
-const TZ_OFFSET = Number(process.env.TZ_OFFSET_MIN || 0); // Ghana (GMT) = 0
+// ---------- weekly timetable ----------
+const TZ_OFFSET = Number(process.env.TZ_OFFSET_MIN || 0);
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const ttFile = (u) => path.join(TIMETABLES, u + '.json');
 const loadTimetable = (u) => { try { return JSON.parse(fs.readFileSync(ttFile(u), 'utf8')); } catch { return []; } };
 const saveTimetable = (u, list) => { const t = ttFile(u) + '.tmp'; fs.writeFileSync(t, JSON.stringify(list, null, 2)); fs.renameSync(t, ttFile(u)); };
 const toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
 function localNow() { const d = new Date(Date.now() + TZ_OFFSET * 60000); return { day: d.getUTCDay(), min: d.getUTCHours() * 60 + d.getUTCMinutes() }; }
-// The class that is on now (a QR can be made from 30 minutes before it starts until it ends)
 function detectSlot(u) {
   const { day, min } = localNow(); const today = loadTimetable(u).filter((e) => e.day === day);
-  return today.find((e) => min >= toMin(e.start) && min < toMin(e.end))          // a class that is in progress
-    || today.find((e) => min >= toMin(e.start) - 30 && min < toMin(e.start)) || null; // or one starting within 30 minutes
+  return today.find((e) => min >= toMin(e.start) && min < toMin(e.end))
+    || today.find((e) => min >= toMin(e.start) - 30 && min < toMin(e.start)) || null;
 }
 const sortTT = (l) => l.sort((a, b) => a.day - b.day || toMin(a.start) - toMin(b.start));
 
@@ -355,7 +348,6 @@ app.post('/api/lecturer/timetable/remove', lecturerOnly, (req, res) => {
   saveTimetable(req.user.u, loadTimetable(req.user.u).filter((e) => !(e.day === Number(day) && e.start === start && e.course === course)));
   res.json(loadTimetable(req.user.u));
 });
-// One-click: BSc IT 2C timetable (courses + weekly slots)
 const PRESET = [
   [1, '10:00', '13:00', 'DATABASE CONCEPTS AND DESIGN (ICT231)', 'ICT 231'],
   [3, '07:00', '10:00', 'WEB TECHNOLOGIES 1 (ICT233)', 'UMT 211'],
@@ -379,7 +371,6 @@ app.get('/api/session/:code', (req, res) => {
   res.json({ name: s.name, venue: s.venue || '', open: isActive(s), expired: isExpired(s), closesAt: s.expiresAt || null, radiusKm: s.radiusKm });
 });
 
-// Look up a student in the class list of the lecturer who owns this session
 app.get('/api/student/:id', (req, res) => {
   if (!/^\d{10}$/.test(req.params.id)) return res.status(400).json({ error: 'ID must be 10 digits' });
   const s = getSession(req.query.code || '');
@@ -389,7 +380,6 @@ app.get('/api/student/:id', (req, res) => {
   res.json(publicStudent(st));
 });
 
-// Early distance check so the student sees "too far" before taking a selfie
 app.post('/api/check', (req, res) => {
   const s = getSession(req.body.code || '');
   const lat = +req.body.lat, lng = +req.body.lng;
@@ -433,7 +423,6 @@ app.post('/api/attend', (req, res) => {
   res.json({ ok: true, name: student.name, studentId, programme: student.programme, time: rec.time });
 });
 
-// Student page: /s/<code>
 app.get('/s/:code', (req, res) => res.sendFile(path.join(__dirname, 'public', 'student.html')));
 
 app.listen(PORT, (err) => {
