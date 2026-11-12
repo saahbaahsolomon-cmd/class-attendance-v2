@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sign your attendance</title>
+<style>
+  :root { --g1:#0b5d3b; --g2:#0f7a4d; --bg:#f3f5f2; --ink:#14201a; --mut:#5d6b63; --line:#dfe5e0; --bad:#b3261e; --warn:#fff6dd; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; }
+  header { background:linear-gradient(160deg,var(--g1),var(--g2)); color:#fff; padding:22px 18px 26px; }
+  header small { opacity:.8; letter-spacing:.04em; }
+  .brand { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+  .brand .badge { background:#fff; border-radius:14px; padding:6px 10px; display:grid; place-items:center; flex:none; }
+  .brand img { height:46px; width:auto; display:block; }
+  header h1 { margin:6px 0 4px; font-size:26px; }
+  header p { margin:0; opacity:.85; font-size:14px; }
+  .steps { display:flex; align-items:center; gap:8px; margin-top:16px; font-size:12px; }
+  .steps .dot { width:22px; height:22px; border-radius:50%; background:rgba(255,255,255,.25); display:grid; place-items:center; font-weight:700; }
+  .steps .on .dot { background:#fff; color:var(--g1); }
+  .steps .line { flex:1; height:2px; background:rgba(255,255,255,.3); }
+  main { max-width:480px; margin:-14px auto 40px; padding:0 14px; }
+  .card { background:#fff; border-radius:16px; padding:18px; box-shadow:0 6px 24px rgba(0,0,0,.08); margin-bottom:12px; }
+  h2 { margin:0 0 4px; font-size:18px; } .sub { color:var(--mut); font-size:13px; margin:0 0 12px; }
+  input { width:100%; font-size:22px; text-align:center; letter-spacing:.12em; padding:14px; border:2px solid var(--line); border-radius:12px; outline:none; }
+  input:focus { border-color:var(--g2); }
+  .count { text-align:center; font-size:11px; color:var(--mut); margin-top:4px; }
+  .pill { border-radius:12px; padding:12px 14px; font-size:13px; margin-bottom:12px; display:flex; gap:10px; align-items:flex-start; }
+  .ok { background:#e5f6ee; border:1px solid #9bd8b9; } .warn { background:var(--warn); border:1px solid #ecd9a0; } .bad { background:#fdeceb; border:1px solid #f1b6b2; color:var(--bad); }
+  .found b { display:block; font-size:16px; } .found span { font-size:13px; color:var(--mut); }
+  button { width:100%; border:0; border-radius:12px; padding:15px; font-size:16px; font-weight:600; background:var(--g1); color:#fff; cursor:pointer; }
+  button:disabled { opacity:.45; cursor:not-allowed; } button.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); margin-top:10px; font-size:14px; padding:11px; }
+  .cam { position:relative; width:260px; height:260px; margin:6px auto 12px; border-radius:50%; overflow:hidden; border:4px solid var(--g2); background:#000; }
+  .cam video, .cam img { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+  .center { text-align:center; } .hide { display:none !important; }
+  .spin { width:38px; height:38px; border:4px solid var(--line); border-top-color:var(--g2); border-radius:50%; animation:s 1s linear infinite; margin:30px auto 14px; }
+  @keyframes s { to { transform:rotate(360deg); } }
+  .tick { width:70px; height:70px; border-radius:50%; background:var(--g2); color:#fff; font-size:38px; display:grid; place-items:center; margin:8px auto 10px; }
+  table { width:100%; font-size:14px; border-collapse:collapse; } td { padding:8px 0; border-bottom:1px solid var(--line); vertical-align:top; } td:last-child { text-align:right; font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="badge"><img src="/logo.png" alt="School logo"></div><small id="cls">ATTENDANCE</small></div>
+  <h1>Sign your attendance</h1>
+  <p>Complete all steps to record your presence</p>
+  <p id="vinfo" style="margin-top:4px;font-size:13px;opacity:.9"></p>
+  <div class="steps">
+    <div class="on" id="s1" style="display:flex;gap:6px;align-items:center"><span class="dot">1</span>Details</div><div class="line"></div>
+    <div id="s2" style="display:flex;gap:6px;align-items:center"><span class="dot">2</span>Selfie</div><div class="line"></div>
+    <div id="s3" style="display:flex;gap:6px;align-items:center"><span class="dot">3</span>Submit</div>
+  </div>
+</header>
+
+<main>
+  <!-- Step 1 -->
+  <section id="v1">
+    <div class="card">
+      <h2>Enter your Student ID</h2><p class="sub">Type your 10-digit reference number to get started</p>
+      <input id="sid" inputmode="numeric" maxlength="10" placeholder="e.g. 2001234567" autocomplete="off">
+      <div class="count" id="cnt">0/10 digits</div>
+    </div>
+    <div class="card hide found" id="found"></div>
+    <div class="pill warn" id="loc">📍 <div>Getting your location…</div></div>
+    <div class="pill warn">📷 <div>Next, a live selfie is taken automatically when you face the camera. Make sure your face is clearly visible.</div></div>
+    <button id="next" disabled>Continue to selfie ›</button>
+  </section>
+
+  <!-- Step 2 -->
+  <section id="v2" class="hide">
+    <div class="card center">
+      <h2 id="camTitle">Face the camera</h2><p class="sub" id="camSub">Hold the phone close to your face — the photo is taken automatically</p>
+      <div class="cam"><video id="vid" playsinline muted autoplay></video><img id="shot" class="hide"></div>
+      <div class="sub" id="camStatus">Looking for your face…</div>
+      <button class="ghost" id="manual">📷 Take photo manually</button>
+      <button class="ghost hide" id="retake">↻ Retake</button>
+    </div>
+  </section>
+
+  <!-- Step 3 -->
+  <section id="v3" class="hide">
+    <div class="card center"><div class="spin"></div><p class="sub">Recording your attendance…</p></div>
+  </section>
+
+  <section id="done" class="hide">
+    <div class="card center">
+      <div class="tick">✓</div><h2>Attendance recorded!</h2><p class="sub">Your attendance has been successfully captured.</p>
+      <table id="receipt"></table>
+      <p class="sub" style="margin-top:14px">You may close this page.</p>
+    </div>
+  </section>
+
+  <div class="pill bad hide" id="err"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const code = location.pathname.split('/').pop().toUpperCase();
+let student = null, pos = null, locOK = false, stream = null, selfie = null, retries = 0;
+
+const err = (m) => { $('err').textContent = m; $('err').classList.toggle('hide', !m); if (m) $('err').scrollIntoView({behavior:'smooth'}); };
+const step = (n) => { ['v1','v2','v3'].forEach((v,i)=>$(v).classList.toggle('hide', i!==n-1)); [1,2,3].forEach(i=>$('s'+i).classList.toggle('on', i<=n)); };
+const refresh = () => $('next').disabled = !(student && locOK);
+
+// ---- session ----
+fetch('/api/session/' + code).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+  if (!ok) { err(j.error); $('next').disabled = true; $('sid').disabled = true; return; }
+  $('cls').textContent = j.name.toUpperCase(); if (j.venue) $('vinfo').textContent = 'Room: ' + j.venue + (j.closesAt ? '  ·  QR valid until ' + new Date(j.closesAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''); else if (j.closesAt) $('vinfo').textContent = 'QR valid until ' + new Date(j.closesAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (!j.open) { err(j.expired ? 'This QR code has expired. The attendance time for this class has ended.' : 'This attendance session is closed.'); $('sid').disabled = true; $('next').disabled = true; }
+});
+
+// ---- location (checked against the 10 km rule on the server) ----
+function getLocation() {
+  if (!navigator.geolocation) { $('loc').className = 'pill bad'; $('loc').lastChild.textContent = 'This browser cannot share location.'; return; }
+  navigator.geolocation.getCurrentPosition(async (p) => {
+    pos = { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy };
+    try {
+      const r = await (await fetch('/api/check', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ code, ...pos }) })).json();
+      if (r.allowed) { locOK = true; $('loc').className = 'pill ok'; $('loc').lastChild.textContent = `Location confirmed — accurate to ±${Math.round(pos.accuracy)}m`; }
+      else { locOK = false; $('loc').className = 'pill bad'; $('loc').lastChild.textContent = `You are ${r.distanceKm} km from class. You must be within ${r.radiusKm} km to sign attendance.`; }
+    } catch { $('loc').className = 'pill bad'; $('loc').lastChild.textContent = 'Could not verify location. Check your connection.'; }
+    refresh();
+  }, (e) => {
+    $('loc').className = 'pill bad';
+    $('loc').lastChild.innerHTML = 'Location is required. Allow location access in your browser, then <a href="" onclick="getLocation();return false">try again</a>.';
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+}
+getLocation();
+
+// ---- student id lookup ----
+$('sid').addEventListener('input', async (e) => {
+  const v = e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+  $('cnt').textContent = v.length + '/10 digits'; student = null; $('found').classList.add('hide'); err(''); refresh();
+  if (v.length !== 10) return;
+  const r = await fetch('/api/student/' + v + '?code=' + encodeURIComponent(code)); const j = await r.json();
+  if (!r.ok) return err(j.error);
+  student = j; $('found').classList.remove('hide');
+  $('found').innerHTML = `<span>STUDENT FOUND</span><b></b><span></span>`;
+  $('found').querySelector('b').textContent = j.name;
+  $('found').lastChild.textContent = `${j.programme} · Year ${j.year}`;
+  refresh();
+});
+
+// ---- selfie ----
+$('next').onclick = async () => {
+  err(''); step(2);
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 640 }, audio: false });
+    $('vid').srcObject = stream; await $('vid').play();
+    autoCapture();
+  } catch { err('Camera access is required. Allow the camera and try again.'); step(1); }
+};
+
+async function autoCapture() {
+  const supported = 'FaceDetector' in window;
+  const det = supported ? new FaceDetector({ fastMode: true, maxDetectedFaces: 1 }) : null;
+  let hits = 0; const t0 = Date.now();
+  const tick = async () => {
+    if (selfie) return;
+    if (det) {
+      try { const f = await det.detect($('vid')); hits = f.length ? hits + 1 : 0; } catch {}
+      if (hits >= 4) return capture();
+      $('camStatus').textContent = hits ? 'Face found — hold still…' : 'Looking for your face…';
+    } else if (Date.now() - t0 > 3500) return capture(); // browsers without face detection: capture after 3.5 s
+    else $('camStatus').textContent = 'Hold still… capturing';
+    setTimeout(tick, 300);
+  };
+  tick();
+}
+
+function capture() {
+  const v = $('vid'), c = document.createElement('canvas');
+  const s = Math.min(v.videoWidth, v.videoHeight) || 480;
+  c.width = c.height = Math.min(s, 480);
+  c.getContext('2d').drawImage(v, (v.videoWidth - s) / 2, (v.videoHeight - s) / 2, s, s, 0, 0, c.width, c.height);
+  selfie = c.toDataURL('image/jpeg', 0.75);
+  stream && stream.getTracks().forEach(t => t.stop());
+  $('shot').src = selfie; $('shot').classList.remove('hide'); $('vid').classList.add('hide');
+  $('camTitle').textContent = 'Photo captured'; $('manual').classList.add('hide'); $('retake').classList.remove('hide');
+  let n = 3; const t = setInterval(() => {
+    if (!selfie) return clearInterval(t);
+    $('camSub').textContent = `Submitting automatically in ${n}…`; $('camStatus').textContent = 'You don’t need to press anything. Tap Retake only if the photo is unclear.';
+    if (n-- === 0) { clearInterval(t); submit(); }
+  }, 1000);
+}
+$('manual').onclick = () => capture();
+$('retake').onclick = async () => {
+  selfie = null; $('shot').classList.add('hide'); $('vid').classList.remove('hide'); $('retake').classList.add('hide'); $('manual').classList.remove('hide');
+  $('camTitle').textContent = 'Face the camera'; $('camSub').textContent = 'Hold the phone close to your face — the photo is taken automatically';
+  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+  $('vid').srcObject = stream; await $('vid').play(); autoCapture();
+};
+
+// ---- submit (location is re-read fresh so it can't be stale) ----
+function freshPosition() {
+  return new Promise((res, rej) => navigator.geolocation.getCurrentPosition(
+    (p) => res({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }), rej, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));
+}
+async function submit() {
+  step(3);
+  try {
+    try { pos = await freshPosition(); } catch {}
+    const r = await fetch('/api/attend', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ code, studentId: student.id, ...pos, selfie }) });
+    const j = await r.json();
+    if (!r.ok) { err(j.error); step(1); selfie = null; return; }
+    $('v3').classList.add('hide'); $('v2').classList.add('hide'); $('v1').classList.add('hide'); $('done').classList.remove('hide');
+    const rows = [['Name', j.name], ['Student ID', j.studentId], ['Programme', j.programme], ['Time', new Date(j.time).toLocaleTimeString()]];
+    $('receipt').innerHTML = rows.map(() => '<tr><td></td><td></td></tr>').join('');
+    [...$('receipt').rows].forEach((tr, i) => { tr.cells[0].textContent = rows[i][0]; tr.cells[1].textContent = rows[i][1]; });
+  } catch { err('Network error. Please try again.'); step(1); selfie = null; }
+}
+</script>
+</body>
+</html>

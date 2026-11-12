@@ -1,0 +1,44 @@
+[
+  {
+    "day": 1,
+    "start": "10:00",
+    "end": "13:00",
+    "course": "DATABASE CONCEPTS AND DESIGN (ICT231)",
+    "venue": "ICT 231"
+  },
+  {
+    "day": 3,
+    "start": "07:00",
+    "end": "10:00",
+    "course": "WEB TECHNOLOGIES 1 (ICT233)",
+    "venue": "UMT 211"
+  },
+  {
+    "day": 3,
+    "start": "10:00",
+    "end": "13:00",
+    "course": "PROGRAMMING WITH JAVA (ICT232)",
+    "venue": "ICT 232"
+  },
+  {
+    "day": 3,
+    "start": "14:00",
+    "end": "17:00",
+    "course": "MICRO ECONOMICS (ECH231)",
+    "venue": "MFB 201"
+  },
+  {
+    "day": 4,
+    "start": "07:00",
+    "end": "10:00",
+    "course": "COURTSHIP AND MARRIAGE (GPD231CA)",
+    "venue": "ESA SP 4"
+  },
+  {
+    "day": 4,
+    "start": "10:00",
+    "end": "13:00",
+    "course": "PROBABILITY AND STATISTICS (MAT239)",
+    "venue": "MFB 101"
+  }
+]

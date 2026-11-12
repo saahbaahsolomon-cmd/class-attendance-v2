@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecturer – Attendance</title>
+<style>
+  :root { --g:#0b5d3b; --line:#dfe5e0; --mut:#5d6b63; --bad:#b3261e; }
+  * { box-sizing:border-box; } body { margin:0; font-family:system-ui,sans-serif; background:#f3f5f2; color:#14201a; }
+  header { background:var(--g); color:#fff; padding:12px 20px; font-weight:700; font-size:18px; display:flex; align-items:center; gap:12px; }
+  header .badge { background:#fff; border-radius:12px; padding:5px 8px; display:grid; place-items:center; flex:none; } header img { height:40px; display:block; }
+  header .who { margin-left:auto; font-size:13px; font-weight:500; display:flex; align-items:center; gap:10px; text-align:right; }
+  header .who button { margin:0; padding:6px 12px; font-size:12px; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.4); }
+  main { max-width:900px; margin:20px auto; padding:0 14px; display:grid; gap:14px; }
+  .card { background:#fff; border-radius:14px; padding:18px; box-shadow:0 4px 18px rgba(0,0,0,.07); }
+  label { display:block; font-size:13px; color:var(--mut); margin:10px 0 4px; }
+  input { width:100%; padding:11px; border:1.5px solid var(--line); border-radius:10px; font-size:15px; }
+  button { background:var(--g); color:#fff; border:0; border-radius:10px; padding:11px 16px; font-size:14px; font-weight:600; cursor:pointer; margin:10px 8px 0 0; }
+  button.alt { background:#fff; color:#14201a; border:1px solid var(--line); }
+  select { width:100%; padding:11px; border:1.5px solid var(--line); border-radius:10px; font-size:15px; background:#fff; }
+  .ghead { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:14px; padding-bottom:4px; border-bottom:2px solid var(--g); }
+  .scroll { overflow-x:auto; } .pct { font-weight:700; }
+  button.small { padding:6px 12px; margin:0; font-size:13px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; } .hide { display:none !important; }
+  .qrbox { text-align:center; } .qrbox img { width:min(100%,360px); } .url { word-break:break-all; font-size:12px; color:var(--mut); }
+  table { width:100%; border-collapse:collapse; font-size:14px; } th,td { text-align:left; padding:8px; border-bottom:1px solid var(--line); }
+  td img { width:44px; height:44px; border-radius:50%; object-fit:cover; cursor:zoom-in; } .err { color:var(--bad); font-size:13px; margin-top:8px; }
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px; }
+  .stat { background:#f3f5f2; border-radius:12px; padding:10px 12px; }
+  .stat b { display:block; font-size:28px; line-height:1.1; } .stat span { font-size:12px; color:var(--mut); }
+  .stat.p b { color:var(--g); } .stat.a b { color:var(--bad); }
+  .bar { height:8px; background:var(--line); border-radius:99px; overflow:hidden; margin-top:10px; } .bar i { display:block; height:100%; background:var(--g); width:0; transition:width .4s; }
+  .tabs { display:flex; gap:8px; margin:10px 0; flex-wrap:wrap; } .tabs button { margin:0; }
+  .tabs button.on { background:var(--g); color:#fff; border-color:var(--g); }
+  .hist { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:14px; }
+  .hist small { color:var(--mut); display:block; }
+  #modal { position:fixed; inset:0; background:rgba(0,0,0,.8); display:flex; align-items:center; justify-content:center; z-index:9; cursor:zoom-out; padding:16px; }
+  #modal div { text-align:center; color:#fff; } #modal img { max-width:min(92vw,520px); max-height:80vh; border-radius:12px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="badge"><img src="/logo.png" alt="School logo"></div>
+  <span>Class Attendance</span>
+  <div class="who hide" id="who"><span id="whoname"></span><button id="out">Sign out</button></div>
+</header>
+<main>
+  <div class="card" id="login">
+    <b>Lecturer sign in</b>
+    <label>Username</label><input id="user" autocomplete="username" autocapitalize="none" placeholder="Your username">
+    <label>Password</label><input id="key" type="password" autocomplete="current-password" placeholder="Your password">
+    <button id="go">Sign in</button><div class="err" id="e0"></div>
+    <div style="font-size:12px;color:var(--mut);margin-top:10px">Admin: username <b>admin</b> with the admin password.</div>
+  </div>
+
+  <div class="card hide" id="admin">
+    <b>Lecturers</b> <span style="color:var(--mut);font-size:13px">— admin only</span>
+    <div id="llist" style="margin:6px 0 10px"></div>
+    <div class="row">
+      <div><label>Full name</label><input id="ln" placeholder="e.g. Mr. Kofi Mensah"></div>
+      <div><label>Username (no spaces)</label><input id="lu" autocapitalize="none" placeholder="e.g. kmensah"></div>
+    </div>
+    <label>Password (at least 6 characters)</label><input id="lp" placeholder="Give the lecturer this password">
+    <button id="ladd">Add lecturer</button><div class="err" id="e3"></div>
+  </div>
+
+  <div class="card hide" id="create">
+    <b>Start a new attendance session</b>
+    <label>Course</label><select id="csel"><option value="">— choose one of your saved courses —</option></select>
+    <div id="detect" style="font-size:13px;margin-top:6px;color:var(--mut)"></div>
+    <label>Or type a course name (only if it is not in the list)</label><input id="name" placeholder="e.g. Discrete Mathematics">
+    <div class="row">
+      <div><label>Allowed distance (km) — 0.15 = 150 m</label><input id="radius" type="number" value="0.15" min="0.05" step="0.05"></div>
+      <div><label>Your location (stand in the lecture room)</label><input id="where" placeholder="Detecting… or type: 6.6885, -1.6244"></div>
+    </div>
+    <label>QR code works for (hours) — it expires automatically after this time</label>
+    <input id="hours" type="number" value="2" min="0.25" max="12" step="0.25">
+    <label>Public link — leave EMPTY when the app is online. On a laptop, paste the https link from the tunnel window</label>
+    <input id="pub" placeholder="https://something.trycloudflare.com">
+    <button id="start">Start session & show QR</button><div class="err" id="e1"></div>
+  </div>
+
+  <div class="card hide" id="courses">
+    <b>My courses</b> <span style="color:var(--mut);font-size:13px">— add each course once, then pick it when you start a session</span>
+    <div id="clist" style="margin:6px 0 4px"></div>
+    <label>Add courses — one per line (you can paste all of them at once)</label><textarea id="cn" rows="3" style="width:100%;padding:11px;border:1.5px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit" placeholder="DATABASE CONCEPTS AND DESIGN (ICT231)"></textarea><button id="cadd">Add courses</button>
+    <div class="err" id="e4"></div>
+  </div>
+
+  <div class="card hide" id="tt">
+    <b>Weekly timetable</b> <span style="color:var(--mut);font-size:13px">— the app uses it to pick the course automatically</span>
+    <div id="ttlist" style="margin:6px 0 8px"></div>
+    <button class="alt small" id="ttpre" style="margin:0 0 10px">Fill in the BSc IT 2C timetable</button>
+    <div class="row">
+      <div><label>Day</label><select id="td"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option></select></div>
+      <div><label>Course</label><select id="tc"></select></div>
+    </div>
+    <div class="row">
+      <div><label>Starts</label><input id="ts" type="time" value="07:00"></div>
+      <div><label>Ends</label><input id="te" type="time" value="10:00"></div>
+    </div>
+    <label>Room / venue (optional)</label><input id="tv" placeholder="e.g. MFB 101">
+    <button id="tadd">Add to timetable</button><div class="err" id="e5"></div>
+  </div>
+
+  <div class="card hide" id="report">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <b id="rtitle"></b>
+      <div><button class="alt small" id="rcsv">Download report (CSV)</button> <button class="alt small" id="rclose">Close</button></div>
+    </div>
+    <div style="color:var(--mut);font-size:13px;margin:6px 0 10px" id="rsub"></div>
+    <div class="scroll"><table><thead><tr><th>Student</th><th>ID</th><th>Attended</th><th>%</th></tr></thead><tbody id="rrows"></tbody></table></div>
+  </div>
+
+  <div class="card hide" id="history">
+    <b>Past sessions</b>
+    <div id="hlist" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card hide" id="roster">
+    <b>Class list</b> <span id="rcount" style="color:var(--mut);font-size:13px"></span>
+    <label>Paste your students — one per line: <i>Index number, Name, Programme, Year</i> (you can copy straight from Excel)</label>
+    <textarea id="rtext" rows="6" style="width:100%;padding:11px;border:1.5px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit" placeholder="5250170208, MENSAH Ama, BSc. Information Technology, 2"></textarea>
+    <button id="rsave">Save class list</button><div class="err" id="e2"></div>
+  </div>
+
+  <div class="card hide" id="live">
+    <div class="row">
+      <div class="qrbox"><img id="qr"><div class="url" id="url"></div></div>
+      <div>
+        <h3 id="title" style="margin-top:0"></h3><div id="meta" style="color:var(--mut);font-size:14px"></div>
+        <div id="left" style="font-weight:700;margin-top:6px"></div>
+        <button id="toggle" class="alt">Close session</button>
+        <button id="extend" class="alt">+30 min</button>
+        <button id="csv" class="alt">Download CSV</button>
+        <button id="new" class="alt">New session</button>
+        <div class="stats">
+          <div class="stat p"><b id="sp">0</b><span>Present</span></div>
+          <div class="stat a"><b id="sa">0</b><span>Absent</span></div>
+          <div class="stat"><b id="spc">0%</b><span>Attendance</span></div>
+        </div>
+        <div class="bar"><i id="bar"></i></div>
+        <div style="color:var(--mut);font-size:12px;margin-top:6px" id="stot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card hide" id="listcard">
+    <input id="search" placeholder="Search by name or index number">
+    <div class="tabs">
+      <button id="tin" class="alt on">Signed in (0)</button>
+      <button id="tout" class="alt">Absent (0)</button>
+    </div>
+    <table id="tpresent"><thead><tr><th></th><th>Student</th><th>ID</th><th>Time</th><th>Distance</th></tr></thead><tbody id="rows"></tbody></table>
+    <table id="tabsent" class="hide"><thead><tr><th>Student</th><th>ID</th><th>Programme</th></tr></thead><tbody id="arows"></tbody></table>
+    <div id="empty" style="color:var(--mut);font-size:14px;padding:10px 0"></div>
+  </div>
+</main>
+
+<div id="modal" class="hide"><div><img id="mimg"><p id="mcap"></p></div></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let key = sessionStorage.getItem('key') || '', role = sessionStorage.getItem('role') || '', loc = null, cur = null, timer = null, data = null, tab = 'in';
+const api = (p, o = {}) => fetch(p, { ...o, headers: { 'Content-Type': 'application/json', 'x-key': key } }).then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) { if (r.status === 401 && key) signOut(); throw new Error(j.error || 'Error'); } return j; });
+const store = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const fetchStored = (k) => { try { return localStorage.getItem(k) || ''; } catch { return ''; } };
+
+function signOut() {
+  clearInterval(timer); key = ''; role = ''; sessionStorage.clear();
+  ['create', 'history', 'roster', 'live', 'listcard', 'admin', 'who', 'courses', 'tt', 'report'].forEach(i => $(i).classList.add('hide'));
+  $('login').classList.remove('hide'); $('key').value = '';
+}
+$('out').onclick = signOut;
+
+function show() {
+  $('pub').value = fetchStored('pub'); $('name').value = fetchStored('cname');
+  $('login').classList.add('hide'); $('create').classList.remove('hide'); $('roster').classList.remove('hide'); $('who').classList.remove('hide');
+  $('whoname').textContent = sessionStorage.getItem('who') || ''; $('courses').classList.remove('hide'); $('tt').classList.remove('hide'); loadCourses().then(loadTimetable);
+  if (role === 'admin') { $('admin').classList.remove('hide'); loadLecturers(); }
+  rcount(); loadHistory();
+  navigator.geolocation.getCurrentPosition(p => { loc = { lat: p.coords.latitude, lng: p.coords.longitude }; $('where').value = `${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}`; },
+    () => { $('where').value = ''; $('where').placeholder = 'Type it: 6.6885, -1.6244'; }, { enableHighAccuracy: true, timeout: 15000 });
+}
+$('user').value = fetchStored('user');
+async function login() {
+  $('e0').textContent = '';
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: $('user').value, password: $('key').value }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Could not sign in');
+    key = j.token; role = j.role; store('user', $('user').value.trim());
+    sessionStorage.setItem('key', key); sessionStorage.setItem('role', role); sessionStorage.setItem('who', j.name + (role === 'admin' ? ' (admin)' : ''));
+    show();
+  } catch (e) { $('e0').textContent = e.message; }
+}
+$('go').onclick = login; $('key').onkeydown = (e) => { if (e.key === 'Enter') login(); };
+if (key) api('/api/lecturer/me').then(show).catch(() => {});
+
+// ---------- admin: lecturers ----------
+async function loadLecturers() {
+  try {
+    const list = await api('/api/admin/lecturers'); const box = $('llist'); box.innerHTML = '';
+    if (!list.length) box.innerHTML = '<div style="color:var(--mut);font-size:14px">No lecturers yet. Add one below.</div>';
+    list.forEach(l => {
+      const d = document.createElement('div'); d.className = 'hist';
+      const left = document.createElement('div'); const b = document.createElement('b'); b.textContent = l.name;
+      const sm = document.createElement('small'); sm.textContent = `${l.username} · ${l.students} students in class list`; left.append(b, sm);
+      const rp = document.createElement('button'); rp.className = 'alt small'; rp.textContent = 'New password';
+      rp.onclick = async () => { const pw = prompt('New password for ' + l.username + ' (min 6 characters):'); if (!pw) return;
+        try { await api(`/api/admin/lecturers/${l.username}/password`, { method: 'POST', body: JSON.stringify({ password: pw }) }); alert('Password changed.'); } catch (e) { alert(e.message); } };
+      const rm = document.createElement('button'); rm.className = 'alt small'; rm.style.marginLeft = '6px'; rm.textContent = 'Remove';
+      rm.onclick = async () => { if (!confirm('Remove ' + l.name + '? They will no longer be able to sign in.')) return; await api('/api/admin/lecturers/' + l.username, { method: 'DELETE' }).catch(e => alert(e.message)); loadLecturers(); };
+      const right = document.createElement('div'); right.append(rp, rm); d.append(left, right); box.appendChild(d);
+    });
+  } catch {}
+}
+$('ladd').onclick = async () => {
+  $('e3').style.color = '#b3261e'; $('e3').textContent = '';
+  try {
+    await api('/api/admin/lecturers', { method: 'POST', body: JSON.stringify({ name: $('ln').value, username: $('lu').value, password: $('lp').value }) });
+    $('e3').style.color = '#0b5d3b'; $('e3').textContent = `Added. Give them username "${$('lu').value.trim().toLowerCase()}" and the password you typed.`;
+    $('ln').value = $('lu').value = $('lp').value = ''; loadLecturers();
+  } catch (e) { $('e3').textContent = e.message; }
+};
+
+// ---------- my courses ----------
+let myCourses = [];
+async function loadCourses() {
+  try {
+    myCourses = await api('/api/lecturer/courses');
+    const box = $('clist'); box.innerHTML = '';
+    if (!myCourses.length) box.innerHTML = '<div style="color:var(--mut);font-size:14px">No courses yet. Add your first one below.</div>';
+    myCourses.forEach(c => {
+      const d = document.createElement('div'); d.className = 'hist';
+      const t = document.createElement('b'); t.textContent = c;
+      const rm = document.createElement('button'); rm.className = 'alt small'; rm.textContent = 'Remove';
+      rm.onclick = async () => { if (!confirm('Remove "' + c + '" from your list? Past sessions are kept.')) return; await api('/api/lecturer/courses/remove', { method: 'POST', body: JSON.stringify({ name: c }) }).catch(e => alert(e.message)); loadCourses(); };
+      d.append(t, rm); box.appendChild(d);
+    });
+    const sel = $('csel'), last = fetchStored('cname');
+    sel.innerHTML = '<option value="auto">★ Auto — pick the course from my timetable</option><option value="">— or choose a course yourself —</option>';
+    myCourses.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+    $('tc').innerHTML = ''; myCourses.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; $('tc').appendChild(o); });
+    sel.value = myCourses.includes(last) && fetchStored('mode') === 'manual' ? last : 'auto';
+  } catch {}
+}
+$('csel').onchange = () => { const v = $('csel').value; store('mode', v === 'auto' ? 'auto' : 'manual'); $('name').value = v && v !== 'auto' ? v : ''; };
+$('cadd').onclick = async () => {
+  $('e4').textContent = '';
+  try { await api('/api/lecturer/courses', { method: 'POST', body: JSON.stringify({ name: $('cn').value }) }); $('cn').value = ''; loadCourses(); }
+  catch (e) { $('e4').textContent = e.message; }
+};
+
+// ---------- past sessions (grouped by course) ----------
+async function loadHistory() {
+  try {
+    const list = await api('/api/lecturer/sessions');
+    const box = $('hlist'); box.innerHTML = '';
+    $('history').classList.toggle('hide', !list.length);
+    const groups = new Map();
+    list.forEach(s => { if (!groups.has(s.name)) groups.set(s.name, []); groups.get(s.name).push(s); });
+    groups.forEach((sessions, course) => {
+      const h = document.createElement('div'); h.className = 'ghead';
+      const t = document.createElement('b'); t.textContent = `${course} (${sessions.length} class${sessions.length === 1 ? '' : 'es'})`;
+      const rb = document.createElement('button'); rb.className = 'small'; rb.textContent = 'Course report'; rb.onclick = () => openReport(course);
+      h.append(t, rb); box.appendChild(h);
+      sessions.slice(0, 8).forEach(s => {
+        const d = document.createElement('div'); d.className = 'hist';
+        const left = document.createElement('div');
+        const sm = document.createElement('span'); sm.textContent = new Date(s.createdAt).toLocaleString();
+        const st = document.createElement('small'); st.textContent = `${s.count} signed in · ${s.active ? 'open until ' + new Date(s.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'ended'}`;
+        left.append(sm, st);
+        const btn = document.createElement('button'); btn.className = 'alt small'; btn.textContent = 'Open';
+        btn.onclick = () => openSession(s).catch(e => $('e1').textContent = e.message);
+        d.append(left, btn); box.appendChild(d);
+      });
+    });
+  } catch {}
+}
+
+// ---------- weekly timetable ----------
+const DAYN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const t12 = (t) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+async function loadTimetable() {
+  try {
+    const list = await api('/api/lecturer/timetable'); const box = $('ttlist'); box.innerHTML = '';
+    $('ttpre').classList.toggle('hide', list.length > 0);
+    if (!list.length) box.innerHTML = '<div style="color:var(--mut);font-size:14px">No timetable yet. Tap the button below, or add each class.</div>';
+    list.forEach(e => {
+      const d = document.createElement('div'); d.className = 'hist';
+      const left = document.createElement('div'); const b = document.createElement('b'); b.textContent = e.course;
+      const sm = document.createElement('small'); sm.textContent = `${DAYN[e.day]} · ${t12(e.start)} – ${t12(e.end)}` + (e.venue ? ` · ${e.venue}` : ''); left.append(b, sm);
+      const rm = document.createElement('button'); rm.className = 'alt small'; rm.textContent = 'Remove';
+      rm.onclick = async () => { await api('/api/lecturer/timetable/remove', { method: 'POST', body: JSON.stringify({ day: e.day, start: e.start, course: e.course }) }); loadTimetable(); };
+      d.append(left, rm); box.appendChild(d);
+    });
+    detectNow();
+  } catch {}
+}
+async function detectNow() {
+  try {
+    const r = await api('/api/lecturer/timetable/now'); const el = $('detect');
+    el.textContent = r.now ? `On your timetable now: ${r.now.course}${r.now.venue ? ' · ' + r.now.venue : ''} (${t12(r.now.start)} – ${t12(r.now.end)})` : 'Nothing is on your timetable right now. Choose a course below to start a class anyway.';
+    el.style.color = r.now ? '#0b5d3b' : 'var(--mut)';
+  } catch {}
+}
+setInterval(() => { if (key && !$('create').classList.contains('hide')) detectNow(); }, 60000);
+$('ttpre').onclick = async () => { await api('/api/lecturer/timetable/preset', { method: 'POST', body: '{}' }); await loadCourses(); loadTimetable(); };
+$('tadd').onclick = async () => {
+  $('e5').textContent = '';
+  try { await api('/api/lecturer/timetable', { method: 'POST', body: JSON.stringify({ day: $('td').value, course: $('tc').value, start: $('ts').value, end: $('te').value, venue: $('tv').value }) }); $('tv').value = ''; loadTimetable(); }
+  catch (e) { $('e5').textContent = e.message; }
+};
+
+// ---------- course report ----------
+let reportCourse = '';
+async function openReport(course) {
+  reportCourse = course;
+  const r = await api('/api/lecturer/report?course=' + encodeURIComponent(course));
+  $('rtitle').textContent = course;
+  $('rsub').textContent = `${r.sessions.length} class${r.sessions.length === 1 ? '' : 'es'} held · ${r.rows.length} students in your class list`;
+  const body = $('rrows'); body.innerHTML = '';
+  r.rows.forEach(x => {
+    const tr = document.createElement('tr'); tr.innerHTML = '<td></td><td></td><td></td><td class="pct"></td>';
+    tr.cells[0].textContent = x.name; tr.cells[1].textContent = x.id; tr.cells[2].textContent = `${x.attended} / ${x.total}`;
+    tr.cells[3].textContent = x.percent + '%'; if (x.total && x.percent < 50) tr.cells[3].style.color = '#b3261e';
+    body.appendChild(tr);
+  });
+  $('report').classList.remove('hide'); $('report').scrollIntoView({ behavior: 'smooth' });
+}
+$('rclose').onclick = () => $('report').classList.add('hide');
+$('rcsv').onclick = () => window.open(`/api/lecturer/report.csv?course=${encodeURIComponent(reportCourse)}&key=${encodeURIComponent(key)}`);
+
+// ---------- start / open a session ----------
+$('start').onclick = async () => {
+  $('e1').textContent = '';
+  const m = $('where').value.match(/(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)/);
+  if (m) loc = { lat: +m[1], lng: +m[2] };
+  if (!loc) return $('e1').textContent = 'Type your location like: 6.6885, -1.6244 (latitude, longitude).';
+  try {
+    if ($('csel').value !== 'auto') store('cname', $('name').value);
+    const s = await api('/api/lecturer/session', { method: 'POST', body: JSON.stringify({ name: $('csel').value === 'auto' ? '' : $('name').value, course: $('csel').value === 'auto' ? 'auto' : undefined, radiusKm: $('radius').value, hours: $('hours').value, ...loc }) });
+    await openSession(s);
+  } catch (e) { $('e1').textContent = e.message; }
+};
+
+async function openSession(s) {
+  clearInterval(timer);
+  cur = s; data = null; $('search').value = ''; setTab('in');
+  const pub = $('pub').value.trim(); store('pub', pub);
+  const q = await api(`/api/lecturer/session/${s.code}/qr` + (pub ? `?base=${encodeURIComponent(pub)}` : ''));
+  $('qr').src = q.qr;
+  $('url').textContent = q.url + (/localhost|127\.0\.0\.1/.test(q.url) ? '  (phones cannot open this: paste your public https link and start again)' : '');
+  $('title').textContent = s.name;
+  applySession(s);
+  ['create', 'history'].forEach(i => $(i).classList.add('hide'));
+  $('live').classList.remove('hide'); $('listcard').classList.remove('hide');
+  await poll(); timer = setInterval(poll, 4000);
+}
+
+// ---------- live dashboard ----------
+async function poll() {
+  data = await api(`/api/lecturer/session/${cur.code}/summary`); applySession(data.session);
+  $('sp').textContent = data.presentCount; $('sa').textContent = data.absentCount;
+  $('spc').textContent = data.percent + '%'; $('bar').style.width = data.percent + '%';
+  $('stot').textContent = `${data.presentCount} of ${data.total} students in the class list`;
+  $('tin').textContent = `Signed in (${data.records.length})`; $('tout').textContent = `Absent (${data.absentCount})`;
+  render();
+}
+const match = (t) => { const q = $('search').value.trim().toLowerCase(); return !q || t.toLowerCase().includes(q); };
+
+function render() {
+  if (!data) return;
+  const present = data.records.slice().reverse().filter(r => match(r.name + ' ' + r.studentId));
+  const absent = data.absent.filter(a => match(a.name + ' ' + a.id));
+  const pb = $('rows'), ab = $('arows'); pb.innerHTML = ''; ab.innerHTML = '';
+  present.forEach(r => {
+    const tr = document.createElement('tr'); tr.innerHTML = '<td><img></td><td></td><td></td><td></td><td></td>';
+    const img = tr.querySelector('img'); img.src = `/api/lecturer/selfie/${r.selfie}?key=${encodeURIComponent(key)}`;
+    img.onclick = () => { $('mimg').src = img.src; $('mcap').textContent = `${r.name} · ${new Date(r.time).toLocaleTimeString()}`; $('modal').classList.remove('hide'); };
+    tr.cells[1].textContent = r.name; tr.cells[2].textContent = r.studentId;
+    tr.cells[3].textContent = new Date(r.time).toLocaleTimeString(); tr.cells[4].textContent = r.distanceKm + ' km';
+    pb.appendChild(tr);
+  });
+  absent.forEach(a => {
+    const tr = document.createElement('tr'); tr.innerHTML = '<td></td><td></td><td></td>';
+    tr.cells[0].textContent = a.name; tr.cells[1].textContent = a.id; tr.cells[2].textContent = a.programme;
+    ab.appendChild(tr);
+  });
+  const n = tab === 'in' ? present.length : absent.length;
+  $('empty').textContent = n ? '' : ($('search').value.trim() ? 'No match.' : (tab === 'in' ? 'Nobody has signed in yet.' : 'Everyone has signed in.'));
+}
+function setTab(t) {
+  tab = t;
+  $('tpresent').classList.toggle('hide', t !== 'in'); $('tabsent').classList.toggle('hide', t !== 'out');
+  $('tin').classList.toggle('on', t === 'in'); $('tout').classList.toggle('on', t === 'out');
+  render();
+}
+$('tin').onclick = () => setTab('in'); $('tout').onclick = () => setTab('out');
+$('search').oninput = render;
+$('modal').onclick = () => $('modal').classList.add('hide');
+
+const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function applySession(s) {
+  cur = s;
+  $('meta').textContent = `Code ${s.code} · within ${s.radiusKm} km of ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}` + (s.expiresAt ? ` · started ${hhmm(s.createdAt)}, QR expires ${hhmm(s.expiresAt)}` : '');
+  $('toggle').textContent = s.active ? 'Close session' : 'Reopen session';
+  tickLeft();
+}
+function tickLeft() {
+  if (!cur) return; const el = $('left');
+  if (!cur.open) { el.textContent = 'Session closed'; el.style.color = '#b3261e'; return; }
+  if (!cur.expiresAt) { el.textContent = ''; return; }
+  const ms = Date.parse(cur.expiresAt) - Date.now();
+  if (ms <= 0) { el.textContent = 'QR code expired — students can no longer sign'; el.style.color = '#b3261e'; return; }
+  const m = Math.floor(ms / 60000); el.textContent = `QR active — ${Math.floor(m / 60)}h ${m % 60}m left`; el.style.color = '#0b5d3b';
+}
+setInterval(tickLeft, 15000);
+$('toggle').onclick = async () => {
+  const open = $('toggle').textContent.startsWith('Re');
+  const s = await api(`/api/lecturer/session/${cur.code}/close`, { method: 'POST', body: JSON.stringify({ open }) });
+  applySession(s);
+};
+$('extend').onclick = async () => { applySession(await api(`/api/lecturer/session/${cur.code}/extend`, { method: 'POST', body: JSON.stringify({ minutes: 30 }) })); };
+$('csv').onclick = () => window.open(`/api/lecturer/session/${cur.code}/csv?key=${encodeURIComponent(key)}`);
+$('new').onclick = () => { clearInterval(timer); $('live').classList.add('hide'); $('listcard').classList.add('hide'); $('create').classList.remove('hide'); loadHistory(); };
+
+// ---------- class list ----------
+function rcount() { api('/api/lecturer/students').then(r => $('rcount').textContent = `— ${r.total} students saved`).catch(() => {}); }
+$('rsave').onclick = async () => {
+  $('e2').style.color = '#b3261e'; $('e2').textContent = '';
+  try {
+    const r = await api('/api/lecturer/students', { method: 'POST', body: JSON.stringify({ text: $('rtext').value }) });
+    $('e2').style.color = '#0b5d3b';
+    $('e2').textContent = `Saved: ${r.added} added, ${r.updated} updated, ${r.skipped} skipped (index numbers must be 10 digits). Total ${r.total}.` + (r.skipped ? ' Example skipped: ' + r.skippedExamples[0] : '');
+    $('rtext').value = ''; rcount();
+  } catch (e) { $('e2').textContent = e.message; }
+};
+</script>
+</body>
+</html>

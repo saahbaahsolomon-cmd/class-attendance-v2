@@ -1,0 +1,22 @@
+# One-click setup for Render (https://render.com). Saved data lives on the disk at /var/data.
+services:
+  - type: web
+    name: class-attendance
+    runtime: node
+    plan: starter            # needed for the saved disk (about $7/month)
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: ADMIN_KEY       # you type your own admin password when Render asks
+        sync: false
+      - key: TOKEN_SECRET
+        generateValue: true
+    disk:
+      name: attendance-data
+      mountPath: /var/data
+      sizeGB: 1
