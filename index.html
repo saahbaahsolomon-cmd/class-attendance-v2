@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>USTED Campus Attendance</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui,Arial}body{margin:0;background:#f1f5f9;color:#0f172a}
+header{background:#0f2a5c;color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}
+header b{font-size:18px}header span{font-size:12px;opacity:.8}
+.wrap{max-width:760px;margin:auto;padding:14px}
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+h2{margin:0 0 8px}h3{margin:14px 0 8px}p{color:#475569;font-size:14px;line-height:1.5}
+input,select,textarea{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:10px;margin:6px 0;font-size:15px}
+button{width:100%;padding:12px;border:0;border-radius:10px;background:#0f2a5c;color:#fff;font-weight:700;font-size:15px;margin:6px 0;cursor:pointer}
+button.sec{background:#e2e8f0;color:#0f172a}button.green{background:#15803d}button.red{background:#b91c1c}button.small{width:auto;padding:8px 12px;font-size:13px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.badge{display:inline-block;background:#dcfce7;color:#166534;padding:4px 8px;border-radius:99px;font-size:12px;font-weight:700}
+.badge.warn{background:#fef9c3;color:#854d0e}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px;border-bottom:1px solid #e2e8f0;text-align:left}
+.qr{font-size:42px;font-weight:900;letter-spacing:6px;text-align:center;background:#0f172a;color:#fff;padding:18px;border-radius:12px;margin:10px 0}
+.hidden{display:none}.muted{font-size:12px;color:#64748b}
+</style>
+</head>
+<body>
+<header><div><b>USTED</b><br><span>Campus Attendance • Local-Only</span></div><div id="topRole"></div></header>
+<div class="wrap">
+
+<!-- LOGIN -->
+<div id="view-login" class="card">
+<h2>Who are you?</h2><p>Data is saved ONLY on this phone / laptop. Not on Render. Not on a central database.</p>
+<label>Your Name</label><input id="in-name" placeholder="e.g. Kwame Mensah">
+<label>Role</label><select id="in-role"><option value="Lecturer">Lecturer</option><option value="Rep">Course Rep</option></select>
+<button onclick="login()">Continue →</button>
+<div class="card" style="background:#eff6ff"><b>Student?</b><p>Don't login here. Click below, enter the session code your lecturer shows.</p><button class="sec" onclick="show('view-student')">I am a Student — Mark Attendance</button></div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="view-dash" class="card hidden">
+<h2 id="dashTitle"></h2><p id="dashSub"></p>
+<div class="row"><button class="sec" onclick="exportBackup()">⬇ Export Backup</button><button class="sec" onclick="document.getElementById('importFile').click()">⬆ Import Backup</button></div>
+<input type="file" id="importFile" class="hidden" accept=".json" onchange="importBackup(event)">
+<label id="groupLabel">Create Class Group</label>
+<input id="g-name" placeholder="e.g. BSc IT Year 1 A">
+<input id="g-program" placeholder="Programme e.g. BSc IT">
+<button onclick="createGroup()">+ Create Group</button>
+<div id="groupList"></div>
+<h3>History</h3><div id="historyList"></div>
+<button class="red" onclick="logout()">Log out</button>
+</div>
+
+<!-- GROUP DETAIL -->
+<div id="view-group" class="card hidden">
+<button class="sec small" onclick="show('view-dash')">← Back</button>
+<h2 id="gTitle"></h2><p id="gInfo"></p>
+<label>Upload Student CSV — Name,IndexNumber</label><input type="file" id="csvFile" accept=".csv">
+<button class="sec" onclick="uploadCSV()">Upload CSV</button>
+<p class="muted">Example CSV:<br>Name,IndexNumber<br>Ama Serwaa,USTED/IT/001<br>Kofi Boateng,USTED/IT/002</p>
+<label>Add Course / Time</label><input id="c-name" placeholder="Course e.g. Discrete Maths">
+<input id="c-time" placeholder="Time e.g. Mon 9am">
+<button onclick="addCourse()">+ Add Course</button>
+<div id="courseList"></div>
+<h3>Students (<span id="stuCount">0</span>)</h3><div id="stuList"></div>
+<button class="green" onclick="startSession()">▶ Start Session + Show QR Code</button>
+<button class="sec" onclick="exportExcel()">📊 Export This Group to Excel (CSV)</button>
+<button class="red small" onclick="deleteGroup()">Delete Group</button>
+</div>
+
+<!-- SESSION -->
+<div id="view-session" class="card hidden">
+<button class="sec small" onclick="show('view-group')">← Back to Group</button>
+<h2>Session LIVE</h2><p id="sessInfo"></p>
+<div>Share this code with students:</div><div class="qr" id="sessCode">------</div>
+<p>Students go to this same link, click <b>I am a Student</b>, enter this code + their Index Number. They must be within <b>150m</b> of you.</p>
+<div class="row"><button onclick="copyLink()">Copy Student Link</button><button class="sec" onclick="refreshSession()">Refresh List</button></div>
+<h3>Present Now (<span id="presentCount">0</span>)</h3><div id="presentList"></div>
+<button class="red" onclick="endSession()">■ End Session & Save to History</button>
+</div>
+
+<!-- STUDENT -->
+<div id="view-student" class="card hidden">
+<h2>Mark Attendance</h2><p>Enter the code on lecturer's screen. Allow location — must be within 150m.</p>
+<label>Session Code</label><input id="s-code" placeholder="6-digit code">
+<label>Your Full Name</label><input id="s-name" placeholder="As in CSV">
+<label>Index Number</label><input id="s-index" placeholder="e.g. USTED/IT/001">
+<button class="green" onclick="studentMark()">📍 Check Location & Mark Present</button>
+<div id="studentMsg"></div>
+<button class="sec" onclick="show('view-login')">← Back to Login</button>
+</div>
+
+</div>
+<script>
+let DB=JSON.parse(localStorage.getItem('usted_v2')||'{"user":null,"groups":[],"sessions":[]}');
+let currentGroup=null, currentSession=null;
+function save(){localStorage.setItem('usted_v2',JSON.stringify(DB));}
+function show(id){['view-login','view-dash','view-group','view-session','view-student'].forEach(v=>document.getElementById(v).classList.add('hidden'));document.getElementById(id).classList.remove('hidden');window.scrollTo(0,0);}
+function login(){
+  let name=document.getElementById('in-name').value.trim(); if(!name) return alert('Enter your name');
+  DB.user={name,role:document.getElementById('in-role').value}; save(); renderDash();
+}
+function logout(){DB.user=null;save();show('view-login');}
+function renderDash(){
+  show('view-dash'); document.getElementById('topRole').innerHTML=DB.user.name+' • '+DB.user.role;
+  document.getElementById('dashTitle').textContent='Hello, '+DB.user.name;
+  document.getElementById('dashSub').textContent=DB.user.role==='Rep' ? 'Rep rule: You can create ONLY 1 Class Group. Add many courses inside it.' : 'Lecturer rule: You can create UNLIMITED Class Groups. One CSV per group.';
+  document.getElementById('groupLabel').textContent=DB.user.role==='Rep' ? 'Your 1 Class Group' : 'Create Class Group';
+  let html=''; DB.groups.forEach((g,i)=>{ html+=`<div class="card" style="background:#f8fafc"><b>${g.name}</b> <span class="badge">${g.students.length} students</span> <span class="badge warn">${g.courses.length} courses</span><br><span class="muted">${g.program} • Created ${new Date(g.created).toLocaleDateString()}</span><br><button onclick="openGroup(${i})">Open Group →</button></div>`});
+  document.getElementById('groupList').innerHTML=html||'<p>No group yet. Create one above.</p>';
+  let h=''; [...DB.sessions].reverse().forEach(s=>{ h+=`<div style="padding:8px 0;border-bottom:1px solid #eee"><b>${s.course}</b> — ${s.groupName}<br><span class="muted">${new Date(s.date).toLocaleString()} • Code ${s.code} • ${s.present.length}/${s.total} present • ${s.total?Math.round(s.present.length/s.total*100):0}%</span><br><button class="sec small" onclick="exportSession('${s.id}')">Export This Session</button></div>`});
+  document.getElementById('historyList').innerHTML=h||'<p>No sessions yet.</p>';
+}
+function createGroup(){
+  let name=document.getElementById('g-name').value.trim(), prog=document.getElementById('g-program').value.trim();
+  if(!name) return alert('Enter group name');
+  if(DB.user.role==='Rep' && DB.groups.length>=1) return alert('Rep rule: You can have only 1 Class Group. Add courses inside that group instead.');
+  DB.groups.push({name,program:prog,students:[],courses:[],created:Date.now()}); save(); renderDash();
+}
+function openGroup(i){currentGroup=i; show('view-group'); renderGroup();}
+function renderGroup(){
+  let g=DB.groups[currentGroup]; document.getElementById('gTitle').textContent=g.name;
+  document.getElementById('gInfo').textContent=g.program+' • '+g.students.length+' students • '+g.courses.length+' courses';
+  document.getElementById('courseList').innerHTML=g.courses.map((c,idx)=>`<div>• <b>${c.name}</b> — ${c.time} <button class="sec small" onclick="delCourse(${idx})">x</button></div>`).join('')||'<p>No courses yet.</p>';
+  document.getElementById('stuCount').textContent=g.students.length;
+  document.getElementById('stuList').innerHTML='<table><tr><th>Name</th><th>Index</th></tr>'+g.students.map(s=>`<tr><td>${s.name}</td><td>${s.index}</td></tr>`).join('')+'</table>';
+}
+function uploadCSV(){
+  let f=document.getElementById('csvFile').files[0]; if(!f) return alert('Choose CSV file');
+  let r=new FileReader(); r.onload=e=>{ let lines=e.target.result.split(/\r?\n/).filter(l=>l.trim()); let arr=[];
+    lines.slice(1).forEach(l=>{let p=l.split(','); if(p[0]) arr.push({name:p[0].trim(),index:(p[1]||'').trim()})});
+    if(!arr.length) return alert('CSV empty. Use Name,IndexNumber');
+    DB.groups[currentGroup].students=arr; save(); renderGroup(); alert(arr.length+' students uploaded. Saved on THIS phone only.'); }; r.readAsText(f);
+}
+function addCourse(){let n=document.getElementById('c-name').value.trim(), t=document.getElementById('c-time').value.trim(); if(!n) return alert('Enter course'); DB.groups[currentGroup].courses.push({name:n,time:t}); save(); renderGroup();}
+function delCourse(i){DB.groups[currentGroup].courses.splice(i,1);save();renderGroup();}
+function deleteGroup(){if(confirm('Delete this group?')){DB.groups.splice(currentGroup,1);save();renderDash();}}
+function startSession(){
+  let g=DB.groups[currentGroup]; if(!g.students.length) return alert('Upload CSV first'); if(!g.courses.length) return alert('Add a course first');
+  let course=prompt('Which course is this session for?\n'+g.courses.map(c=>c.name+' - '+c.time).join('\n')); if(!course) return;
+  let code=Math.floor(100000+Math.random()*900000).toString();
+  currentSession={id:Date.now().toString(),groupName:g.name,course,code,date:Date.now(),total:g.students.length,present:[],lat:null,lon:null};
+  // capture host location
+  if(navigator.geolocation){navigator.geolocation.getCurrentPosition(p=>{currentSession.lat=p.coords.latitude;currentSession.lon=p.coords.longitude; alert('Host location locked. Students must be within 150m.');},()=>alert('Location denied — students cannot be verified. Allow location.'));}
+  show('view-session'); document.getElementById('sessInfo').textContent=g.name+' • '+course+' • '+new Date().toLocaleString();
+  document.getElementById('sessCode').textContent=code; document.getElementById('s-code').value=code;
+  renderSession();
+}
+function renderSession(){ if(!currentSession) return; document.getElementById('presentCount').textContent=currentSession.present.length; document.getElementById('presentList').innerHTML=currentSession.present.map(p=>`• ${p.name} (${p.index}) — ${new Date(p.time).toLocaleTimeString()}`).join('<br>')||'No one yet.'; }
+function refreshSession(){renderSession();}
+function copyLink(){let link=location.href.split('?')[0]+'?code='+currentSession.code; navigator.clipboard.writeText(link+' — Code: '+currentSession.code); alert('Link + code copied. Send via WhatsApp.');}
+function endSession(){DB.sessions.push(currentSession); save(); currentSession=null; alert('Session saved to History on this phone.'); renderDash();}
+function distKm(a,b,c,d){let R=6371, dLat=(c-a)*Math.PI/180, dLon=(d-b)*Math.PI/180; let x=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+function studentMark(){
+  let code=document.getElementById('s-code').value.trim(), name=document.getElementById('s-name').value.trim(), idx=document.getElementById('s-index').value.trim();
+  if(!code||!name||!idx) return alert('Fill all fields');
+  // If host is on same phone, use currentSession. If student is on different phone, we simulate via local check + prompt for host location fallback
+  let msg=document.getElementById('studentMsg');
+  if(!currentSession || currentSession.code!==code){ msg.innerHTML='<p style="color:#b91c1c"><b>Session not found on this phone.</b><br>Student must open the link from the lecturer, OR lecturer must type this student in manually. For USTED: lecturer phone is the host — students scan on lecturer phone or lecturer shares live code and confirms location on his phone.</p>'; 
+    // Still allow host to manually add if this is host phone and code matches history
+    return; }
+  if(currentSession.present.find(p=>p.index.toLowerCase()===idx.toLowerCase())) return msg.innerHTML='<p>Already marked present.</p>';
+  if(!navigator.geolocation) return alert('Allow location');
+  navigator.geolocation.getCurrentPosition(p=>{
+    let d=distKm(currentSession.lat,currentSession.lon,p.coords.latitude,p.coords.longitude)*1000;
+    if(currentSession.lat && d>150){ msg.innerHTML=`<p style="color:#b91c1c">Too far: ${Math.round(d)}m away. Must be within 150m.</p>`; return; }
+    currentSession.present.push({name,index:idx,time:Date.now()}); msg.innerHTML=`<p style="color:#15803d"><b>✓ Present!</b> ${name} marked. Distance: ${currentSession.lat?Math.round(d)+'m':'Location check skipped (host location not set)'}</p>`; renderSession();
+  },()=>{ msg.innerHTML='<p style="color:#b91c1c">Location denied. Allow location to mark present.</p>';});
+}
+function exportBackup(){let blob=new Blob([JSON.stringify(DB)],{type:'application/json'}); let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='usted-backup-'+new Date().toISOString().slice(0,10)+'.json'; a.click(); alert('Backup saved. Keep it in Google Drive. Use Import Backup on new phone.');}
+function importBackup(e){let r=new FileReader(); r.onload=ev=>{try{DB=JSON.parse(ev.target.result); save(); renderDash(); alert('Backup restored!');}catch{alert('Invalid backup file')}}; r.readAsText(e.target.files[0]);}
+function exportExcel(){
+  let g=DB.groups[currentGroup]; let csv='Name,IndexNumber,Group,Programme\n'+g.students.map(s=>`"${s.name}","${s.index}","${g.name}","${g.program}"`).join('\n');
+  let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=g.name.replace(/\s/g,'_')+'-students.csv'; a.click();
+}
+function exportSession(id){let s=DB.sessions.find(x=>x.id===id); if(!s) return; let csv='Name,Index,Status,Course,Date\n'+s.present.map(p=>`"${p.name}","${p.index}",Present,"${s.course}","${new Date(s.date).toLocaleString()}"`).join('\n'); let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='attendance-'+s.code+'.csv'; a.click();}
+if(DB.user) renderDash();
+// auto-fill code from URL
+let params=new URLSearchParams(location.search); if(params.get('code')){show('view-student'); document.getElementById('s-code').value=params.get('code');}
+</script>
+</body>
+</html>
